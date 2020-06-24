@@ -74,7 +74,7 @@ class User(object):
             # @@ move to validator???
             raise HTTPConflict("User %s Exists" % uid)
         self.request.response.status_code = 201
-        return True
+        return "ok"
 
     @property
     def user_data(self):
@@ -104,13 +104,19 @@ class User(object):
         dref = self.get_user_ref(user['userid'])
         dref.set(user)
         self.request.response.status_code = 202
-        return True
+        return "ok"
 
     def delete(self):
         uid = self.request.matchdict['id']
+        uref = self.get_user_ref(uid)
+        if not uref.get().exists:
+            self.request.errors.add("body", "users", "User does not exist")
+            self.request.errors.status = 404
+            return "not ok"
+
         self.get_user_ref(uid).delete()
         self.request.response.status_code = 204
-        return True
+        return "ok"
 
 
 @resource(collection_path="/groups", path="/groups/{id}")
@@ -134,7 +140,7 @@ class Group(object):
         except Exception as e:
             raise HTTPConflict("Group %s Exists" % guid)
         self.request.response.status_code = 201
-        return True
+        return "ok"
 
     def get_user_data(self, userid):
         uref = self.get_user_ref(userid)
@@ -145,13 +151,14 @@ class Group(object):
     def put(self):
         guid = self.request.matchdict.get('id')
         snap = self.get_group_ref(guid).get()
-        for userid in self.request.json_body['users']:
+        for userid in self.request.json_body:
             udata, uref = self.get_user_data(userid)
             gs = set(udata['groups'])
             gs.add(guid)
             udata['groups'] = list(gs)
             uref.set(udata)
         self.request.response.status_code = 202
+        return "ok"
 
     @view(validators=('group_exists'))
     def get(self):
