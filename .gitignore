@@ -1,0 +1,6 @@
+/.coverage
+/.tox/
+*~
+*/__pycache__
+*.pyc
+/usersvc.egg-info/
