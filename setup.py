@@ -7,12 +7,12 @@ setup(name='usersvc',
       packages=find_packages(),
       include_package_data=True,
       install_requires=['cornice',
-                        'waitress',
                         'colander',
-                        'google-cloud-firestore',
-                        'cached_property'],
+                        'google-cloud-firestore'],
       entry_points="""\
       [paste.app_factory]
       main=usersvc.app:main
+      [console_scripts]
+      usersvc.ftest=usersvc.tests.functional_test:exercise
       """,
       paster_plugins=['pyramid'])
