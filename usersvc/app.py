@@ -1,4 +1,3 @@
-from cached_property import threaded_cached_property
 from cornice.resource import resource
 from cornice.resource import view
 from cornice.validators import colander_body_validator
@@ -7,6 +6,7 @@ from pyramid.config import Configurator
 from pyramid.httpexceptions import HTTPNotFound
 from pyramid.httpexceptions import HTTPCreated
 from pyramid.httpexceptions import HTTPNotAcceptable
+from pyramid.httpexceptions import HTTPConflict
 import colander
 
 
@@ -41,7 +41,7 @@ class User(object):
           .document(userid)
         return dref
 
-    @threaded_cached_property
+    @property
     def groups(self):
         gref = self.db.collection(u'groups')
         return {g.id for g in gref.stream()}
@@ -54,7 +54,7 @@ class User(object):
 
     def groups_exist(self, request, **kwargs):
         user = self.request.json_body
-        groups = user['groups']
+        groups = user.get('groups', [])
         bad_groups = [group for group in groups \
                       if group not in self.groups]
         if bad_groups:
@@ -70,7 +70,7 @@ class User(object):
         dref = self.get_user_ref(uid)
         try:
             dref.create(user)
-        except Exception:
+        except Exception as e:
             # @@ move to validator???
             raise HTTPConflict("User %s Exists" % uid)
         self.request.response.status_code = 201
@@ -116,7 +116,7 @@ class User(object):
 @resource(collection_path="/groups", path="/groups/{id}")
 class Group(object):
     """
-    Representation of a collection of users
+    Representation of a collection of ugrefsers
     """
     def __init__(self, request, context=None):
         self.db = request.db
@@ -131,7 +131,7 @@ class Group(object):
         gref = self.get_group_ref(guid)
         try:
             gref.create(dict(name=guid))
-        except Exception:
+        except Exception as e:
             raise HTTPConflict("Group %s Exists" % guid)
         self.request.response.status_code = 201
         return True
@@ -174,17 +174,17 @@ class Group(object):
             user_data = snap.to_dict()
             groups = user_data['groups']
             groups.remove(guid)
-            snap.reference.update(dict(groups=old_groups))
+            snap.reference.update(dict(groups=groups))
         self.request.response.status_code = 204
 
     def get_group_ref(self, group_name):
-        dref = self.db\
+        dref = self.db \
           .collection(u'groups')\
           .document(group_name)
         return dref
 
     def users_by_group_query(self, guid):
-        cref = self.db.collection(u'groups')
+        cref = self.db.collection(u'users')
         query = cref.where(u'groups', u'array_contains', guid)
         return query
 
@@ -215,6 +215,7 @@ class Group(object):
     def group_must_not_exist(self, request, **kw):
         guid = self.request.json_body.get('name')
         snap = self.get_group_snapshot(guid)
+
         if snap.exists:
             self.request.errors.add('body', 'group', 'group exists')
             self.request.errors.status = 403
